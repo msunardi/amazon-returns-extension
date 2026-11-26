@@ -1,0 +1,30 @@
+# Packaged builds (web-ext build / sign, Chrome "Pack extension")
+web-ext-artifacts/
+*.zip
+*.xpi
+*.crx
+
+# Private signing keys and upload state: never commit these
+*.pem
+.amo-upload-uuid
+
+# API keys (e.g. AMO credentials for web-ext sign)
+.env
+.env.*
+!.env.example
+
+# Node tooling, if any is added (web-ext, linters, tests)
+node_modules/
+npm-debug.log*
+.npm/
+
+# Debug pages saved from the dashboard: they contain your order details
+amazon-orders-page-*.html
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

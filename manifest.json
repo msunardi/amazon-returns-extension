@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Amazon Return Manager",
+  "version": "0.1.0",
+  "description": "See your Amazon orders from the last 30 days on one dashboard, start returns in one click, and keep the return QR codes next to each item.",
+  "action": {
+    "default_title": "Open Amazon Return Manager"
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "scripts": [
+      "src/background.js"
+    ],
+    "type": "module"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "amazon-return-manager@example.local",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "permissions": [
+    "storage",
+    "scripting",
+    "alarms"
+  ],
+  "optional_host_permissions": [
+    "https://*.amazon.com/*",
+    "https://*.amazon.ca/*",
+    "https://*.amazon.co.uk/*",
+    "https://*.media-amazon.com/*",
+    "https://*.ssl-images-amazon.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "minimum_chrome_version": "116"
+}

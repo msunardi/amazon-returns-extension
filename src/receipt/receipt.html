@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Amazon return receipt</title>
+  <link rel="stylesheet" href="receipt.css">
+</head>
+<body>
+  <div class="controls no-print">
+    <h1>Return receipt</h1>
+    <p>Every return saved in the dashboard. Untick items you've already dropped off, then print.</p>
+    <div class="row">
+      <button id="printBtn" class="primary">Print</button>
+      <button id="allBtn">Select all</button>
+      <button id="noneBtn">Select none</button>
+      <label><input type="checkbox" id="photosToggle" checked> Item pictures</label>
+    </div>
+    <p id="count" class="muted"></p>
+  </div>
+
+  <main id="receipt" class="receipt"></main>
+
+  <script type="module" src="receipt.js"></script>
+</body>
+</html>

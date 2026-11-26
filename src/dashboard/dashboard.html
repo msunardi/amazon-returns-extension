@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Amazon Return Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Return Manager</h1>
+      <p id="subtitle" class="muted">Orders from the last 30 days</p>
+    </div>
+    <div class="actions">
+      <button id="scanBtn" class="primary" hidden>Scan orders</button>
+      <button id="printBtn" hidden title="Print every saved return with its QR code">Print return receipt</button>
+      <button id="revokeBtn" class="ghost" hidden>Revoke access &amp; delete data</button>
+    </div>
+  </header>
+
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+
+  <section id="consent" class="panel" hidden>
+    <h2>Allow access to your Amazon orders?</h2>
+    <p>To build this dashboard, the extension needs your permission to read your Amazon order history in this browser. Here is what it does:</p>
+    <ul>
+      <li>It reads the <strong>Your Orders</strong> pages for the last 30 days, using the Amazon sign-in already in this browser.</li>
+      <li>It reads the return pages <strong>only in return windows you open from this dashboard</strong>, to save the QR code Amazon shows you.</li>
+      <li>Everything is stored <strong>only on this computer</strong> (in the extension's local storage). Nothing is sent anywhere else.</li>
+      <li>It only scans when you click a button. You can revoke access and delete the data at any time.</li>
+    </ul>
+    <label class="field">
+      Amazon store
+      <select id="marketSelect"></select>
+    </label>
+    <div class="row">
+      <button id="consentBtn" class="primary">Allow and scan my orders</button>
+    </div>
+    <p class="muted small">Chrome will ask you to confirm access to the Amazon site and Amazon's image servers.</p>
+  </section>
+
+  <section id="signin" class="panel warn" hidden>
+    <h2 id="signinTitle">You're not signed in to Amazon</h2>
+    <p id="signinText">Sign in to Amazon in this browser, then click <strong>Scan orders</strong> again.</p>
+    <button id="openAmazonBtn" class="primary">Open Amazon</button>
+  </section>
+
+  <section id="returnaryPanel" class="panel slim" hidden>
+    <label class="check"><input type="checkbox" id="rtEnabled"> Send returns to Returnary</label>
+    <input id="rtUrl" type="url" aria-label="Returnary address" spellcheck="false">
+    <button id="rtSyncBtn">Sync now</button>
+    <span id="rtStatus" class="muted" role="status"></span>
+  </section>
+
+  <section id="refundSummary" class="panel slim" hidden>
+    <span>Expected refunds for your saved returns: <strong id="refundTotal" class="refund-total"></strong></span>
+    <span id="refundDetail" class="muted"></span>
+  </section>
+
+  <main id="orders"></main>
+
+  <details id="diag" class="panel" hidden>
+    <summary>Troubleshooting details</summary>
+    <p class="muted small">What the last scan and the return windows saw: page addresses (which can include order numbers), counts and image sizes. The saved page contains your order details: keep it on your computer.</p>
+    <div class="row">
+      <button id="copyDiagBtn">Copy details</button>
+      <button id="saveHtmlBtn">Save the last Amazon page (HTML)</button>
+    </div>
+    <h3>Last scan</h3>
+    <pre id="diagText">No scan in this session yet.</pre>
+    <h3>Return windows</h3>
+    <pre id="returnLogText">No return window opened in this session yet.</pre>
+  </details>
+
+  <dialog id="lightbox">
+    <form method="dialog">
+      <img id="lightboxImg" alt="Return QR code">
+      <p id="lightboxCaption" class="muted"></p>
+      <button class="primary">Close</button>
+    </form>
+  </dialog>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>

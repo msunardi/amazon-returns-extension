@@ -558,6 +558,13 @@ function renderReturnary() {
 function renderSyncState(key) {
   const s = state.sync[key];
   if (!s) return state.returnary.enabled ? h('span', { class: 'muted' }, 'Returnary: not queued yet') : null;
+  const hasQr = !!(state.returns[key]?.qrDataUrl || state.returns[key]?.qrUrl); // label returns have none
+  if (s.status === 'synced' && s.qrInReturnary === false && hasQr) {
+    return h('span', { class: 'warn' },
+      s.returnsUrl ? h('a', { href: s.returnsUrl, target: '_blank', rel: 'noopener' }, 'In Returnary') : 'In Returnary',
+      ` without the QR code: ${s.qrProblem || 'unknown reason'}. `,
+      h('button', { class: 'link', onclick: () => enqueueReturn(key) }, 'Retry'));
+  }
   if (s.status === 'synced') {
     const label = s.already ? 'Already in Returnary' : 'Added to Returnary';
     return s.returnsUrl

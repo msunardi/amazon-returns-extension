@@ -85,6 +85,7 @@ If an amount isn't picked up, the return window's log (Troubleshooting details) 
 - **Sending:** when Returnary is running, queued returns are sent right away. While it isn't running, they wait and are retried every 5 minutes, when the browser starts, when you open the dashboard, and when you click **Sync now**.
 - **Prices:** when you click **Start return**, the dashboard also reads the order's details page, so Returnary gets each item's price and quantity.
 - **No duplicates:** Returnary only adds what it doesn't have yet: the purchase (matched by order number), the item (matched by ASIN or name) and the return (only its QR code and return number are filled in if missing). Sending a return twice changes nothing.
+- **QR codes:** Returnary stores PNG, JPEG, WEBP and GIF images. A QR code in any other format, such as SVG, is converted to PNG before sending. A QR code saved only as a link is downloaded first. Returnary replies whether the return has a QR code. If a saved one didn't arrive, the item shows "In Returnary without the QR code" with the reason, and **Retry**.
 - **Status:** each item on the dashboard shows "Waiting to sync", "Added to Returnary ↗" / "Already in Returnary ↗" (opens it there), or why it couldn't be added, with **Retry**.
 
 Code: `src/sync.js` (queue and sending), `src/lib/parser.js` → `parseOrderDetails`. Returnary's side is `amazon_import.py` and the `/api/...` routes in its `app.py`.

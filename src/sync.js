@@ -58,8 +58,52 @@ function isoFromText(text) {
   const ts = m ? Date.parse(m[1].replace('.', '')) : NaN;
   return Number.isNaN(ts) ? null : isoDate(new Date(ts));
 }
-// Returnary keeps PNG/JPEG/WEBP/GIF.
-const storableImage = (url) => (/^data:image\/(png|jpeg|webp|gif);base64,/.test(url || '') ? url : null);
+// ---- images ---------------------------------------------------------------------
+// Returnary keeps PNG/JPEG/WEBP/GIF. Anything else (Amazon can draw QR codes
+// as SVG) is redrawn as a PNG first.
+const STORABLE = /^data:image\/(png|jpeg|webp|gif);base64,/;
+const MIN_QR_EDGE = 480; // SVGs have no pixel size: draw them large enough to scan
+
+async function toPngDataUrl(dataUrl) {
+  const blob = await (await fetch(dataUrl)).blob();
+  let source = await createImageBitmap(blob).catch(() => null); // raster images, in any context
+  let width = source?.width;
+  let height = source?.height;
+  if (!source && typeof Image !== 'undefined') {
+    // SVG: needs an <img>, which Firefox's background script has (Chrome's service worker doesn't).
+    const img = new Image();
+    img.src = dataUrl;
+    await img.decode();
+    source = img;
+    width = img.naturalWidth || MIN_QR_EDGE;
+    height = img.naturalHeight || MIN_QR_EDGE;
+  }
+  if (!source) throw new Error('This browser cannot convert the image');
+  const scale = Math.max(1, MIN_QR_EDGE / Math.max(width, height));
+  const canvas = new OffscreenCanvas(Math.round(width * scale), Math.round(height * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+  const png = new Uint8Array(await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < png.length; i += 0x8000) bin += String.fromCharCode.apply(null, png.subarray(i, i + 0x8000));
+  return `data:image/png;base64,${btoa(bin)}`;
+}
+
+/** A data: URL Returnary can store, from a data: URL or an image address. Throws with the reason. */
+async function storableImage(dataUrl, url, fetchImage) {
+  let data = dataUrl?.startsWith('data:image/') ? dataUrl : null;
+  if (!data && url) data = await fetchImage(url).catch(() => null);
+  if (!data) throw new Error(url ? 'the image could not be downloaded from Amazon' : 'no image was saved');
+  if (STORABLE.test(data)) return data;
+  try {
+    return await toPngDataUrl(data);
+  } catch (err) {
+    throw new Error(`the ${data.slice(5, data.indexOf(';'))} image could not be converted (${err.message})`);
+  }
+}
+const optionalImage = (dataUrl, url, fetchImage) => storableImage(dataUrl, url, fetchImage).catch(() => null);
 
 async function buildPayload(itemKey, rec, domain, fetchImage) {
   const item = rec.item;
@@ -67,15 +111,22 @@ async function buildPayload(itemKey, rec, domain, fetchImage) {
   const asin = item.asin || itemKey.split('|')[1] || null;
   const details = rec.orderItems || [];
   const mine = details.find((i) => i.asin === asin);
-  const photo = async (url) => (url ? fetchImage(url).catch(() => null) : null);
 
   const items = await Promise.all(details.slice(0, 20).map(async (i) => ({
     asin: i.asin, name: i.title, price: i.price, quantity: i.quantity,
-    photo: storableImage(await photo(i.image)),
+    photo: await optionalImage(null, i.image, fetchImage),
   })));
-  if (!mine) items.push({ asin, name: item.title, price: null, quantity: 1, photo: storableImage(await photo(item.image)) });
+  if (!mine) items.push({ asin, name: item.title, price: null, quantity: 1, photo: await optionalImage(null, item.image, fetchImage) });
 
-  return {
+  let qr = null;
+  let qrProblem = null;
+  if (rec.qrDataUrl || rec.qrUrl) {
+    qr = await storableImage(rec.qrDataUrl, rec.qrUrl, fetchImage).catch((err) => { qrProblem = err.message; return null; });
+  } else {
+    qrProblem = rec.labelUrl ? 'this is a label return, without a QR code' : 'no QR code was saved for this return';
+  }
+
+  const payload = {
     order: {
       orderId: item.orderId,
       orderDate: item.orderTs ? isoDate(new Date(item.orderTs)) : isoFromText(item.orderDate),
@@ -85,8 +136,9 @@ async function buildPayload(itemKey, rec, domain, fetchImage) {
     },
     items,
     item: { asin, name: mine?.title || item.title, price: mine?.price ?? null, quantity: mine?.quantity ?? 1 },
-    return: { qr: storableImage(rec.qrDataUrl), code: rec.code || null },
+    return: { qr, code: rec.code || null },
   };
+  return { payload, qrProblem };
 }
 
 // ---- talking to Returnary ------------------------------------------------------
@@ -126,9 +178,9 @@ async function doSync(fetchImage) {
   for (const [key, state] of Object.entries(sync)) {
     if (state.status !== 'pending' || !returns[key]) continue;
     const attempts = (state.attempts || 0) + 1;
-    let payload;
+    let payload, qrProblem;
     try {
-      payload = await buildPayload(key, returns[key], consent.domain, fetchImage);
+      ({ payload, qrProblem } = await buildPayload(key, returns[key], consent.domain, fetchImage));
     } catch (err) {
       await setState({ items: { [key]: { status: 'failed', attempts, lastError: err.message, lastAttempt: Date.now() } } });
       continue;
@@ -152,6 +204,9 @@ async function doSync(fetchImage) {
       await setState({ items: { [key]: {
         status: 'synced', attempts, lastError: null, syncedAt: Date.now(), already: !!body.already_there,
         returnsUrl: body.returns_url ? `${origin.base}${body.returns_url}` : null,
+        // Whether the return in Returnary has a QR code now (older Returnary: unknown).
+        qrInReturnary: typeof body.has_qr === 'boolean' ? body.has_qr : null,
+        qrProblem: body.has_qr ? null : qrProblem || (payload.return.qr ? 'Returnary did not accept the image' : null),
       } } });
     } else {
       const error = body.error || `Returnary answered ${res.status}.`;
@@ -165,4 +220,23 @@ async function doSync(fetchImage) {
 
 export async function ensureAlarm() {
   if (!(await chrome.alarms.get(ALARM))) chrome.alarms.create(ALARM, { periodInMinutes: SYNC_EVERY_MINUTES });
+}
+
+// Returns synced before QR codes were checked have no qrInReturnary field:
+// queue them once more, so Returnary can add a missing QR code. (Returnary
+// only fills in what's missing, so this changes nothing for complete ones.)
+export function requeueUncheckedQr() {
+  return locked(async () => {
+    const { sync = {}, returns = {} } = await chrome.storage.local.get(['sync', 'returns']);
+    let changed = 0;
+    for (const [key, s] of Object.entries(sync)) {
+      const rec = returns[key];
+      if (s.status === 'synced' && !('qrInReturnary' in s) && (rec?.qrDataUrl || rec?.qrUrl)) {
+        sync[key] = { ...s, status: 'pending', attempts: 0, queuedAt: Date.now() };
+        changed++;
+      }
+    }
+    if (changed) await chrome.storage.local.set({ sync });
+    return changed;
+  });
 }

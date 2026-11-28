@@ -18,7 +18,11 @@
     '(?:show|scan|bring|present) (?:this|the|your) qr code',
     'drop (?:it |them )?off by',
   ].join('|'), 'i');
-  const CODE_TEXT = /(?:return|drop[- ]?off|authori[sz]ation|rma)\s*code\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{3,})/i;
+  // "Return code: ABC123" or "Your return code is ABC123". The label is matched
+  // in any case, the code itself must look like one (capitals and digits), so
+  // "Return code\nItem" is skipped.
+  const CODE_TEXT = /(?:return|drop[- ]?off|authori[sz]ation|rma)\s*code\s*(?:is\s+)?[:#]?\s*([A-Za-z0-9][A-Za-z0-9-]{3,})/gi;
+  const looksLikeCode = (c) => /\d/.test(c) && !/[a-z]/.test(c);
   const RETURN_BY_TEXT =
     /(?:return|drop[- ]?off|ship)\s+(?:it\s+)?by\s+((?:[A-Za-z]+,?\s+)?[A-Za-z]+\.?\s+\d{1,2}(?:,\s*\d{4})?|\d{1,2}\s+[A-Za-z]+(?:\s+\d{4})?)/i;
   const LOCATION_TEXT =
@@ -166,7 +170,7 @@
       (a) => /print.*label|label.*print|download.*label/i.test(a.textContent) || /\/label/i.test(a.href),
     );
     return {
-      code: text.match(CODE_TEXT)?.[1] ?? null,
+      code: [...text.matchAll(CODE_TEXT)].map((m) => m[1]).find(looksLikeCode) ?? null,
       returnBy: text.match(RETURN_BY_TEXT)?.[0]?.trim() ?? null,
       location: text.match(LOCATION_TEXT)?.[0]?.trim().slice(0, 160) ?? null,
       labelUrl: labelLink?.href?.startsWith('https://') ? labelLink.href : null,

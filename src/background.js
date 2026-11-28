@@ -1,7 +1,7 @@
 // Service worker: opens the dashboard, opens return windows, injects the
 // QR watcher into them, and saves what the watcher captures.
 import { isMarketplaceUrl } from './lib/config.js';
-import { ALARM, ensureAlarm, locked, queue, syncNow } from './sync.js';
+import { ALARM, ensureAlarm, locked, queue, requeueUncheckedQr, syncNow } from './sync.js';
 
 const DASHBOARD_URL = chrome.runtime.getURL('src/dashboard/dashboard.html');
 const WATCHER_FILE = 'src/content/return-watcher.js';
@@ -55,6 +55,7 @@ chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === ALARM) startSy
 chrome.runtime.onStartup.addListener(() => { ensureAlarm(); startSync(); });
 chrome.runtime.onInstalled.addListener(() => { ensureAlarm(); });
 ensureAlarm();
+requeueUncheckedQr().then((n) => { if (n) startSync(); });
 
 function cleanRefund(refund) {
   const amount = Number(refund?.amount);
